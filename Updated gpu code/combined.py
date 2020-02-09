@@ -27,23 +27,34 @@ import math
 from sklearn.metrics import mean_squared_error
 #print(os.listdir("../input"))
 
+##Changing these variables
+index_reader = 5
+no_of_epochs = 35
 
-dataframe0 = pd.read_csv("./harsh/train.csv")
-dataframe1 = pd.read_csv('./harsh/building_1_anolomy.csv')
-dataframe2 = pd.read_csv('./harsh/building_2_anolomy.csv')
-dataframe3 = pd.read_csv('./harsh/building_3_anolomy.csv')
-dataframe4 = pd.read_csv('./harsh/building_4_anolomy.csv')
-dataframe5 = pd.read_csv('./harsh/building_5_anolomy.csv')
+dataframe0 = pd.read_csv("./train.csv")
+#dataframe1 = pd.read_csv('./building_1_anolomy.csv')
+dataframe1 = pd.read_csv('./building_'+str(index_reader)+'_anolomy.csv')
+#dataframe1 = pd.read_csv('./building_3_anolomy.csv')
+#dataframe4 = pd.read_csv('./building_4_anolomy.csv')
+#dataframe5 = pd.read_csv('./building_5_anolomy.csv')
+shape_old_df1 = dataframe1.shape[0]
+#Adding testfile 
+test_new = pd.read_csv('./test_b'+str(index_reader)+'.csv')
+#test_for_index = pd.read_csv('./test.csv')
+#test_for_index['timestamp'] = pd.to_datetime(test_for_index['timestamp'],format='%Y-%m-%d %H:%M'
+dataframe1 = pd.concat([dataframe1,test_new],axis=0)
 
-interval = [dataframe1.shape[0], dataframe2.shape[0], dataframe3.shape[0], dataframe4.shape[0], dataframe5.shape[0]]
+interval = [dataframe1.shape[0]]#, dataframe2.shape[0], dataframe3.shape[0], dataframe4.shape[0], dataframe5.shape[0]]
 
-dataframe = pd.concat([dataframe1, dataframe2, dataframe3, dataframe4, dataframe5], axis = 0)
+dataframe = dataframe1#pd.concat([dataframe1, dataframe2, dataframe3, dataframe4, dataframe5], axis = 0)
 print("The shape of raw data is -: ", dataframe.shape)
-
+print("Shape of training data -: ", shape_old_df1)
+print("Shape of testing data -: ", test_new.shape)
 
 dataframe = dataframe.drop(['Unnamed: 0'],axis=1)
 print(dataframe.info())
-dataframe['timestamp']=pd.to_datetime(dataframe['timestamp'],format='%d-%m-%Y %H:%M')
+dataframe['timestamp'][:-test_new.shape[0]]=pd.to_datetime(dataframe['timestamp'][:-test_new.shape[0]],format='%d-%m-%Y %H:%M')
+dataframe['timestamp'][-test_new.shape[0]:]=pd.to_datetime(dataframe['timestamp'][-test_new.shape[0]:],format='%d/%m/%Y %H:%M')
 dataframe0['timestamp']=pd.to_datetime(dataframe0['timestamp'],format='%Y-%m-%d %H:%M:%S')
 
 
@@ -60,6 +71,7 @@ dataframe.index = dataframe['timestamp']
 time_series = dataframe[['main_meter', 'sub_meter_1', 'sub_meter_2', 'corporate', 'day of week_0','day of week_1','day of week_2','day of week_3','day of week_4','day of week_5','day of week_6','building_number_1','building_number_2','building_number_3','building_number_4','building_number_5']] #'building_number','Hour', 'day of week']]#
 
 dummy_test_data = dataframe0[['main_meter','sub_meter_1', 'sub_meter_2']]
+
 
 
 from numpy import newaxis
@@ -79,9 +91,9 @@ from sklearn.preprocessing import MinMaxScaler
 val_time = 1
 n_input = 72
 n_features = 16
-val_length = int(float(dataframe1.shape[0])*0.2)
+val_length = test_new.shape[0]#int(float(dataframe1.shape[0])*0.2)
 n_pred = 3
-
+val_length_new = int(float(shape_old_df1)*0.2)
 val_gap = val_time*4
 
 sum = 0
@@ -91,26 +103,35 @@ for i, c in enumerate(interval):
 	if (i == 0):
 		train_data = time_series[:c-val_length]
 		test_data = time_series[c-val_length:c]
-		actual_test_data = dummy_test_data[(c-val_length)*val_gap:c*val_gap]
+		test_data_old = time_series[c-val_length-val_length_new:c-val_length]
+		actual_test_data = dummy_test_data[(c-val_length-val_length_new)*val_gap:(c-val_length)*val_gap]
 	else:
 		train_data = pd.concat([train_data, time_series[sum:sum+c-val_length]])
 		test_data = pd.concat([test_data, time_series[sum+c-val_length:sum+c]])
-		actual_test_data = pd.concat([actual_test_data, dummy_test_data[(sum+c-val_length)*val_gap:(sum+c)*val_gap]])
+		# test_data_old = pd.concat([test_data_old, time_series[sum+c-]])
+		actual_test_data = pd.concat([actual_test_data, dummy_test_data[(sum+c-val_length-val_length_new)*val_gap:(sum+c-val_length)*val_gap]])
 	sum += c
 	interval[i] = sum - (i+1)*val_length
 
+test_data_old = pd.DataFrame(test_data_old).values.reshape(-1, n_features)
 test_data = pd.DataFrame(test_data).values.reshape(-1,n_features)
 train_data = pd.DataFrame(train_data).values.reshape(-1,n_features)
 df_test = actual_test_data.copy()
 actual_test_data = actual_test_data.to_numpy()
 actual_test_data = actual_test_data.reshape(-1, n_pred)
 
+print("Training data shape ", train_data.shape)
+print("Testing data shape ", test_data.shape)
+print("Testing data for evaluation shape ", test_data_old.shape)
+print("Labels for evaluation shape (shold be 4 times) -", actual_test_data.shape)
+
+#print(train_data.shape)
 #starting with intialization 
 scaler = MinMaxScaler()
 
-scaler.fit(time_series)
+scaler.fit(time_series[:interval[0]])
 scaled_train_data = scaler.transform(train_data)
-scaled_test_data = scaler.transform(test_data)
+scaled_test_data = scaler.transform(test_data_old)
 
 
 from keras.preprocessing.sequence import TimeseriesGenerator
@@ -138,7 +159,6 @@ X_train = X_train[perm]
 y_train = y_train[perm]
 
 print("Shape of training data after final processing -: ", X_train.shape)
-
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, GRU
 from tensorflow.keras.layers import Dense
@@ -147,11 +167,11 @@ from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import SGD
 
 
-val = "buildingall_1hr_sigmoid_mainmeter_adam_1"
+val = "building"+str(index_reader)+"_1hr_sigmoid_3meter_adam_1_final"
 
 lstm_model = Sequential()
 lstm_model.add(GRU(300,  return_sequences=True, activation='relu',input_shape=(n_input,n_features)))
-lstm_model.add(GRU(50, return_sequences=True, activation='relu'))
+#lstm_model.add(GRU(50, return_sequences=True, activation='relu'))
 lstm_model.add(GRU(50,activation='relu'))
 lstm_model.add(Dense(3, activation='sigmoid'))
 
@@ -161,39 +181,57 @@ lstm_model.compile(optimizer='adam',loss='mse')
 print(lstm_model.summary())
 
 model_json = lstm_model.to_json()
-with open("./harsh/Json/model_LSTM_model_all_"+ val +".json", "w") as json_file:
+with open("./Json/model_LSTM_model_all_"+ val +".json", "w") as json_file:
     json_file.write(model_json)
 
 
-lstm_model.fit(X_train, y_train, epochs=40, batch_size = 1024)
+lstm_model.fit(X_train, y_train, epochs=no_of_epochs, batch_size = 1024)
 
-lstm_model.save_weights("./harsh/weights/model_LSTM_model_all_"+ val +".h5")
+lstm_model.save_weights("./weights/model_LSTM_model_all_"+ val +".h5")
 print("Saved model to disk")
 
-json_file = open("./harsh/Json/model_LSTM_model_all_"+ val +".json", 'r')
+
+json_file = open("./Json/model_LSTM_model_all_"+ val +".json", 'r')
 loaded_model_json = json_file.read()
 json_file.close()
 lstm_model = model_from_json(loaded_model_json)
 # load weights into new model
-lstm_model.load_weights("./harsh/weights/model_LSTM_model_all_"+ val +".h5")
+lstm_model.load_weights("./weights/model_LSTM_model_all_"+ val +".h5")
 print("Loaded model from disk")
 
 lstm_predictions_scaled = list()
 
 sum = 0
+
+
 for c in interval:
-	batch = scaled_train_data[c-n_input:c, :]
+	batch = scaled_train_data[c-val_length_new-n_input:c-val_length_new, :]
 	current_batch = batch.reshape((1,n_input,n_features))
-	for i in range(sum, sum+val_length):   
+	for i in range(sum, sum+val_length_new):   
 		# print((lstm_model.predict(current_batch)).astype(np.float64))
 		lstm_pred = ((lstm_model.predict(current_batch)).astype(np.float64))
 		# print(train_data[c-n_input+i-sum,1], test_data[i][1])
 		#print(lstm_pred, scaled_test_data[i][0], test_data[i][0])
-		dummy = test_data[i].copy()
+		dummy = test_data_old[i].copy()
 		dummy[:n_pred] = lstm_pred
 		lstm_predictions_scaled.append(dummy)
 		current_batch = np.append(current_batch[:,1:],[dummy.reshape(1, -1)], axis=1)
-	sum += val_length
+	sum += val_length_new
+
+
+# for c in interval:
+# 	batch = scaled_train_data[c-val_length_new-n_input:c-val_length_new, :]
+# 	current_batch = batch.reshape((1,n_input,n_features))
+# 	for i in range(sum, sum+val_length):   
+# 		# print((lstm_model.predict(current_batch)).astype(np.float64))
+# 		lstm_pred = ((lstm_model.predict(current_batch)).astype(np.float64))
+# 		# print(train_data[c-n_input+i-sum,1], test_data[i][1])
+# 		#print(lstm_pred, scaled_test_data[i][0], test_data[i][0])
+# 		dummy = test_data[i].copy()
+# 		dummy[:n_pred] = lstm_pred
+# 		lstm_predictions_scaled.append(dummy)
+# 		current_batch = np.append(current_batch[:,1:],[dummy.reshape(1, -1)], axis=1)
+# 	sum += val_length
 
 lstm_predictions = scaler.inverse_transform(lstm_predictions_scaled)
 pred = np.array(lstm_predictions[:, :n_pred])
@@ -205,6 +243,7 @@ pred = pred.reshape(-1, n_pred)
 # for i in range(pred.shape[0]):
 # 	print(pred[i][0], actual_test_data[i][0])
 print(pred.shape, actual_test_data.shape)
+
 
 def evalution_metric(m,m_hat,timestamp):
     Dt=timestamp.day
@@ -225,12 +264,40 @@ sum = 0
 for j, c in enumerate(interval):
 	print("########################### For Building "+str(j)+"###########################")	
 	for i in range(n_pred):
-		mean_squared_error_lstm = mse(actual_test_data[sum:sum+val_length,i], pred[sum:sum+val_length,i])
+		mean_squared_error_lstm = mse(actual_test_data[sum:sum+val_length_new,i], pred[sum:sum+val_length_new,i])
 		# mean_squared_log_error_lstm = msle(test_data,lstm_predictions)
 		print("METER "+str(i+1)+"-: ")
 		print(mean_squared_error_lstm**0.5)
-		print(evalution_metric(actual_test_data[sum:sum+val_length,i],pred[sum:sum+val_length, i],df_test[sum:sum+val_length].index))
+		print(evalution_metric(actual_test_data[sum:sum+val_length_new,i],pred[sum:sum+val_length_new, i],df_test[sum:sum+val_length_new].index))
 	sum += val_length
+
+
+print(interval[0], shape_old_df1)
+# assert interval[0] == shape_old_df1, "Shape of C do not match complete training data"
+
+sum=0
+lstm_predictions_scaled = list()
+
+for c in interval:
+	batch = scaled_train_data[c-n_input:c, :]
+	current_batch = batch.reshape((1,n_input,n_features))
+	for i in range(sum, sum+val_length):   
+		# print((lstm_model.predict(current_batch)).astype(np.float64))
+		lstm_pred = ((lstm_model.predict(current_batch)).astype(np.float64))
+		#print(lstm_pred)
+		#print(lstm_pred, scaled_test_data[i][0], test_data[i][0])
+		dummy = test_data[i].copy()
+		dummy[:n_pred] = lstm_pred
+		lstm_predictions_scaled.append(dummy)
+		current_batch = np.append(current_batch[:,1:],[dummy.reshape(1, -1)], axis=1)
+	sum += val_length
+
+
+lstm_predictions = scaler.inverse_transform(lstm_predictions_scaled)
+pred = np.array(lstm_predictions[:, :n_pred])
+pred = np.repeat(pred, val_gap, axis = 0)
+
+pred_dataframe = pd.DataFrame(pred).to_csv('./building_'+str(index_reader)+'_predictions.csv')
 
 
 
