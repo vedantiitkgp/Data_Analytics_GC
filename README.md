@@ -1,6 +1,4 @@
-# Data Analytics General Championship 
-RP Hall Silver Wining Repository for Data Analytics GC 2020 
-<img src="https://5.imimg.com/data5/PE/PT/MY-4859558/silver-medals-500x500.jpg" width ="30" height = "30">
+# Electricity Demand Forecast - Data Analytics GC (RP Hall Silver ) 
 
 Electrical Energy is one of the most important sources for the social and economic development
 of all nations. The growth in energy consumption is essentially linked with the growth in the
@@ -198,4 +196,5 @@ We are stacking the predictions from GRU & ARIMA Models, and we use the value of
 
 <img width="614" alt="Screenshot 2022-01-27 at 12 01 51 AM" src="https://user-images.githubusercontent.com/32813089/151225126-c02abc0d-8208-41c0-a091-4514c3edc65e.png">
 
-![Uploading Screenshot 2022-01-27 at 12.01.51 AM (1).png…]()
+<img width="557" alt="Screenshot 2022-01-27 at 12 01 51 AM (1)" src="https://user-images.githubusercontent.com/32813089/151225904-568d8176-b400-44b7-b551-8a120f90251a.png">
+
